@@ -1,0 +1,13 @@
+#!/bin/sh
+# Terminal launcher: pick orchestrator + team, then start the orchestrator session.
+self=$0
+while [ -L "$self" ]; do
+  dir=$(cd "$(dirname "$self")" && pwd -P); t=$(readlink "$self")
+  case "$t" in /*) self=$t ;; *) self=$dir/$t ;; esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd -P)
+case "$1" in
+  run|debate|show|discover|options|set-role|set-orchestrator|clear-role|banner)
+    exec node "$root/skills/agent-team/scripts/team.mjs" "$@" ;;
+  *) exec node "$root/skills/agent-team/scripts/launch.mjs" "$@" ;;
+esac
