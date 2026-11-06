@@ -1,6 +1,6 @@
 ---
 name: agent-team
-description: Run this session as the orchestrator of a multi-agent team — pick which installed coding agents (Claude Code, Codex, OpenCode, DeepSeek Harness) and which models/thinking efforts serve as implementer, tester, reviewer and joker (do-what-you're-told assistant), delegate work to them headlessly, and hold constructive debates with any of them. Use when the user asks to set up / show / change their agent team, delegate or hand off implementation, testing, or review to another agent or model, get a second opinion, or "debate" a decision with another model.
+description: Run this session as the orchestrator of a multi-agent team — pick which installed coding agents (Claude Code, Codex, OpenCode, Bob Shell, DeepSeek Harness) and which models/thinking efforts serve as implementer, tester, reviewer and joker (do-what-you're-told assistant), delegate work to them headlessly, and hold constructive debates with any of them. Use when the user asks to set up / show / change their agent team, delegate or hand off implementation, testing, or review to another agent or model, get a second opinion, or "debate" a decision with another model.
 license: MIT
 metadata:
   version: 0.1.0
@@ -29,12 +29,12 @@ Run `team.mjs show`. Then:
 ## 1. Setup
 
 1. `team.mjs discover` (add `--refresh` if the user just installed something) lists every installed agent with its model ids and the thinking efforts each model offers. **Only offer ids from this output**, never invent one; the user may type a custom id.
-2. **Orchestrator (you).** Tell the user which agent/model/effort you're running as. You can't change your own model mid-session, so if they want a different one, tell them how: in Claude Code `/model` (effort is in the same menu); in Codex `/model`; or quit and run `agent-team` in a terminal to launch the orchestrator they pick. Record the choice with `team.mjs set-orchestrator --agent … --model … --effort …`.
+2. **Orchestrator (you).** Tell the user which agent/model/effort you're running as. You can't change your own model mid-session, so if they want a different one, tell them how: in Claude Code `/model` (effort is in the same menu); in Codex `/model`; in Bob Shell `/model` or restart with `bob -m <model>`; or quit and run `agent-team` in a terminal to launch the orchestrator they pick. Record the choice with `team.mjs set-orchestrator --agent … --model … --effort …`.
 3. **For each role in order (implementer, tester, reviewer, joker)** ask three short questions: which agent (this agent counts as a choice too, and so does "skip"), which model of that agent, which effort among that model's efforts. Use your harness's structured question tool if it has one (e.g. AskUserQuestion: put the 3 likeliest models as options and let "Other" take any id from the list); otherwise post a numbered list and accept a number. Offer "add another implementer?" after the first.
 4. Save each one: `team.mjs set-role --role implementer --agent dsh --model "ollama-cloud/deepseek-v4.1-flash:1017" --effort high` (`--append` adds an extra member; `--name fast` gives it a handle; `--scope project` writes `.agent-team.json` in the repo instead of `~/.agent-team/team.json`).
 5. `team.mjs show` and confirm.
 
-Agent keys: `claude`, `codex`, `opencode` (models are `provider/model`, including `ollama-cloud/*`), `dsh` (DeepSeek Harness, models are `provider/model` from its config; it can be a team member but not the orchestrator).
+Agent keys: `claude`, `codex`, `opencode` (models are `provider/model`, including `ollama-cloud/*`), `bob` (IBM Bob Shell; it can't list models or efforts, so the only listed model is `default`, meaning the server's choice, and any other id the user types is passed to `bob -m`), `dsh` (DeepSeek Harness, models are `provider/model` from its config; it can be a team member but not the orchestrator).
 
 ## 2. Delegating
 
@@ -67,6 +67,8 @@ Triggered when the user says "debate …", "argue this out with …", "get <memb
 
 ## Notes
 
-- `dsh` has no enforced read-only mode: read-only work is passed to it as an instruction only. Prefer `claude`/`codex`/`opencode` as reviewer or debate opponent if a guarantee matters, or check `git status` afterwards.
+- `dsh` and `bob` have no enforced read-only mode: read-only work is passed to them as an instruction (Bob also runs in `ask` chat mode), so check `git status` afterwards. Prefer `claude`/`codex`/`opencode` as reviewer or debate opponent if a guarantee matters.
 - `opencode` models that start with `ollama-cloud/` and the `dsh` `ollama-cloud/*` models both run on Ollama Cloud. Both CLIs must already be signed in / keyed (the DeepSeek Harness key is the one saved on its Models page).
+- `bob` needs its own login (`BOBSHELL_API_KEY` or SSO) and network access to Bob's service. If a run fails with `fetch failed`, that is a connectivity/auth problem, not a bad brief.
+- Running inside Bob Shell: Bob has no skills feature, so the installer drops `~/.bob/rules/agent-team.md`, which points Bob at this file. Use your command tool for the `team.mjs` calls and plain chat for the setup questions.
 - Never put secrets in briefs. Briefs and outputs are saved under `~/.agent-team/runs/`.

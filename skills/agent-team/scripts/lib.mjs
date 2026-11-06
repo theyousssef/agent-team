@@ -28,6 +28,30 @@ function which(bin) {
   const r = spawnSync('/bin/sh', ['-c', `command -v "${bin}"`], { encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim() : null;
 }
+// Codex ships inside some desktop apps/IDE extensions without being put on PATH
+// (e.g. the VS Code "openai.chatgpt" extension). Use CODEX_BIN, then PATH, then those bundles.
+function detectCodex() {
+  if (process.env.CODEX_BIN && fs.existsSync(process.env.CODEX_BIN)) return process.env.CODEX_BIN;
+  const onPath = which('codex');
+  if (onPath) return onPath;
+  const found = [];
+  const home = os.homedir();
+  for (const dir of ['.vscode', '.vscode-insiders', '.cursor', '.windsurf']) {
+    const ext = path.join(home, dir, 'extensions');
+    let names = []; try { names = fs.readdirSync(ext).filter((n) => n.startsWith('openai.chatgpt-')); } catch { /* no such editor */ }
+    for (const n of names) {
+      const bin = path.join(ext, n, 'bin');
+      let plats = []; try { plats = fs.readdirSync(bin); } catch { /* no bin dir */ }
+      for (const pl of plats) {
+        const c = path.join(bin, pl, process.platform === 'win32' ? 'codex.exe' : 'codex');
+        if (fs.existsSync(c)) found.push({ c, n });
+      }
+    }
+  }
+  for (const app of ['/Applications/Codex.app/Contents/Resources/codex']) if (fs.existsSync(app)) found.push({ c: app, n: '' });
+  found.sort((a, b) => b.n.localeCompare(a.n, undefined, { numeric: true })); // newest extension version first
+  return found[0]?.c || null;
+}
 function capture(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 60_000, maxBuffer: 64 * 1024 * 1024, ...opts });
   return r.status === 0 ? r.stdout : null;
@@ -86,7 +110,7 @@ export const ADAPTERS = {
     label: 'Codex CLI',
     canOrchestrate: true,
     readOnlyEnforced: true,
-    detect: () => which('codex'),
+    detect: detectCodex,
     models(bin) {
       const out = capture(bin, ['debug', 'models']);
       if (!out) return [];
@@ -171,6 +195,30 @@ export const ADAPTERS = {
       };
     },
     interactive: ({ bin, model, prompt }) => ({ cmd: bin, args: ['-m', model, '--prompt', prompt] }),
+  },
+
+  bob: {
+    label: 'Bob Shell',
+    canOrchestrate: true,
+    // Headless Bob only runs non-destructive tools unless --yolo is set, but ask-mode is not documented as a hard
+    // read-only guarantee, so treat it as advisory: the runner adds a "do not modify files" instruction and git-diffs.
+    readOnlyEnforced: false,
+    detect: () => which('bob'),
+    // Bob has no model-listing command; the server picks the model unless one is requested with -m.
+    models: () => [{ id: 'default', name: 'Bob default (server-selected)', efforts: [] }],
+    buildRun({ bin, model, mode, prompt }) {
+      const args = [];
+      if (model && model !== 'default') args.push('-m', model);
+      if (mode === 'read-only') args.push('--chat-mode', 'ask');
+      else args.push('--chat-mode', 'code', '--yolo'); // write/full: headless edits and commands need --yolo
+      // Only the final answer, not the intermediate tool chatter. The brief goes in on stdin (no argv length limit);
+      // Bob appends the positional prompt to it.
+      args.push('--hide-intermediary-output', 'Carry out the task described above.');
+      return { cmd: bin, args, stdin: prompt, readOutput: (stdout) => ({ text: stdout.trim() }) };
+    },
+    interactive: ({ bin, model, prompt }) => ({
+      cmd: bin, args: [...(model && model !== 'default' ? ['-m', model] : []), '-i', prompt],
+    }),
   },
 
   dsh: {
