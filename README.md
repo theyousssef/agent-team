@@ -21,6 +21,7 @@ Inspired by [amElnagdy/delegate-skills](https://github.com/amElnagdy/delegate-sk
 | `claude` | Claude Code | built-in list (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1) | low … max | yes |
 | `codex` | Codex CLI | `codex debug models` | per model (low … ultra) | yes |
 | `opencode` | OpenCode | `opencode models --verbose`, including `ollama-cloud/*` | per model variants | yes |
+| `bob` | IBM Bob Shell | not listable: `default` (server-selected) or any id you type, passed to `bob -m` | none | yes |
 | `dsh` | DeepSeek Harness | your harness config (`~/.dsh/profiles/desktop/cordis.patch.yml`), e.g. `ollama-cloud/deepseek-v4.1-flash:1017` | off / low / medium / high | team member only |
 
 You can see what's installed with `agent-team discover`.
@@ -29,7 +30,8 @@ You can see what's installed with `agent-team discover`.
 
 ```sh
 cd ~/Documents/delegate-skill
-./install.sh                 # links the skill into ~/.claude/skills and ~/.codex/skills, adds `agent-team` to ~/.local/bin
+./install.sh                 # links the skill into ~/.claude/skills (Claude Code + OpenCode) and ~/.codex/skills, writes
+                             # ~/.bob/rules/agent-team.md for Bob Shell, adds `agent-team` to ~/.local/bin
 ./install.sh --session-hook  # optional: Claude Code shows your roster at every new session
 ./install.sh --uninstall
 ```
@@ -37,6 +39,13 @@ cd ~/Documents/delegate-skill
 Requirements: Node 18+, and each CLI you want to use must already be logged in. For DeepSeek Harness, save the Ollama Cloud key on its **Models** page; the skill reads it from the harness's own credential store.
 
 The skill folder is a symlink, so edits in this repo take effect immediately.
+
+**Per agent:**
+
+- **Claude Code**: skill at `~/.claude/skills/agent-team`; use `/agent-team`.
+- **OpenCode**: also reads `~/.claude/skills`, so it picks up the same link; ask it to "set up my agent team".
+- **Codex**: skill at `~/.codex/skills/agent-team`; use `$agent-team`. The CLI is found on `PATH`, via `CODEX_BIN`, or inside the VS Code / Cursor / Windsurf "OpenAI ChatGPT" extension if you only have that.
+- **Bob Shell**: Bob has no skills feature, so the installer writes `~/.bob/rules/agent-team.md`, a short rules file Bob loads into every session. It tells Bob to read `SKILL.md` and run `team.mjs` through its command tool. Ask Bob to "set up my agent team". Remove it with `./install.sh --uninstall` (only if the installer created it).
 
 ## Using it
 
@@ -114,8 +123,9 @@ agent-team debate end  --id <id> --message "Decision: …"
 
 ## Limits
 
-- **DeepSeek Harness has no enforced read-only mode.** For reviewer/debate work it only gets a "don't modify files" instruction. Prefer Claude, Codex, or OpenCode where you need a guarantee.
+- **DeepSeek Harness and Bob Shell have no enforced read-only mode.** For reviewer/debate work they only get a "don't modify files" instruction (Bob also runs in `ask` chat mode). Prefer Claude, Codex, or OpenCode where you need a guarantee.
 - The orchestrator can't switch its own model mid-session; use `/model` or relaunch with `agent-team`.
+- Bob Shell can't list its models or efforts, so thinking effort is not offered for it. A `bob` run needs network access to Bob's service and a login (`BOBSHELL_API_KEY` or SSO).
 - Claude's model list is built in. Pass any other id with `c` in the picker or `--model` on the CLI.
 - Ollama's local CLI (`ollama`) isn't required. Ollama Cloud models run through OpenCode (`ollama-cloud/*`) or DeepSeek Harness.
 - Runs block until the member finishes; in Claude Code the orchestrator runs them in the background.
